@@ -57,12 +57,12 @@ def generate_client_services(number):
 
 def write_compose_file(file_path, number):
     compose_text = generate_docker_compose_text(number)
-    with open(file_path, 'w') as f:
+    with open(f"./{file_path}", 'w') as f:
         f.write(compose_text)
 
 
-def __main__():
 
+def __main__():
     parser = argparse.ArgumentParser(description="<name of docker compose file> <number of clients>")
     parser.add_argument("file", type=str, help="file name")
     parser.add_argument("number", type=int, help="number of clients")
@@ -70,3 +70,8 @@ def __main__():
 
     write_compose_file(args.file, args.number)
     print(f"Docker compose file '{args.file}' generated with {args.number} clients.")
+
+
+
+if __name__ == "__main__":
+    __main__()
