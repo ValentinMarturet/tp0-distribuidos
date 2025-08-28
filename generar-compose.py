@@ -42,7 +42,7 @@ def generate_client_services(number):
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_ID=1
+      - CLI_ID={i}
       - CLI_LOG_LEVEL=DEBUG
     networks:
       - testing_net
