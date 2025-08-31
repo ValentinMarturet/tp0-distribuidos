@@ -64,7 +64,7 @@ class Server:
         logging.info('action: server_cleanup | result: in_progress')
         if self._server_socket:
             self._server_socket.close()
-            logging.info('action: server_cleanup | result: success')
+            logging.info('action: exit | result: success')
 
     def __handle_client_connection(self, client_sock):
         """
