@@ -1,5 +1,6 @@
 import socket
 import logging
+import signal
 
 
 class Server:
@@ -8,6 +9,32 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+
+        self._running = True
+
+        self._setup_signal_handlers()
+
+    
+    def _setup_signal_handlers(self):
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+
+    
+    def _signal_handler(self, signum, frame):
+        signal_name = signal.Signals(signum).name
+        logging.info(f'action: shutdown_signal | result: received | signal: {signal_name}')
+        self._shutdown()
+
+    def _shutdown(self):
+        logging.info('action: graceful_shutdown | result: in_progress')
+        self._running = False
+
+        if self._server_socket:
+            try:
+                self._server_socket.close()
+                logging.info('action: close_server_socket | result: success')
+            except Exception as e:
+                logging.error(f'action: close_server_socket | result: fail | error: {e}')
 
     def run(self):
         """
@@ -20,9 +47,24 @@ class Server:
 
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+        while self._running:
+            try:
+
+                client_sock = self.__accept_new_connection()
+                self.__handle_client_connection(client_sock)
+            except OSError as e:
+                if not self._running:
+                    logging.info('action: server_loop | result: shutdown_requested')
+                    break
+                else:
+                    logging.error(f'action: accept_connection | result: fail | error: {e}')
+        self._cleanup()
+
+    def _cleanup(self):
+        logging.info('action: server_cleanup | result: in_progress')
+        if self._server_socket:
+            self._server_socket.close()
+            logging.info('action: server_cleanup | result: success')
 
     def __handle_client_connection(self, client_sock):
         """
