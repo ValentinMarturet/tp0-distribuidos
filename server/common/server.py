@@ -22,7 +22,7 @@ class Server:
     
     def _signal_handler(self, signum, frame):
         signal_name = signal.Signals(signum).name
-        logging.info(f'action: shutdown_signal | result: received | signal: {signal_name}')
+        logging.info(f'action: shutdown_signal | result: in_progress | signal: {signal_name}')
         self._shutdown()
 
     def _shutdown(self):
@@ -54,7 +54,7 @@ class Server:
                 self.__handle_client_connection(client_sock)
             except OSError as e:
                 if not self._running:
-                    logging.info('action: server_loop | result: shutdown_requested')
+                    # logging.info('action: server_loop | result: shutdown_requested')
                     break
                 else:
                     logging.error(f'action: accept_connection | result: fail | error: {e}')
