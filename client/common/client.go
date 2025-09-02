@@ -183,12 +183,9 @@ func (c *Client) interruptibleSleep(duration time.Duration) {
 	
 	start := time.Now()
 	
-	for {
-		select {
-		case <-ticker.C:
-			if !c.isRunning() || time.Since(start) >= duration {
-				return
-			}
+	for range ticker.C {
+		if !c.isRunning() || time.Since(start) >= duration {
+			return
 		}
 	}
 }
