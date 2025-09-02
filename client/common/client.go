@@ -6,6 +6,9 @@ import (
 	"net"
 	"time"
 	"sync"
+	"os"
+    "os/signal" 
+    "syscall"
 
 	"github.com/op/go-logging"
 )
@@ -40,7 +43,7 @@ func NewClient(config ClientConfig) *Client {
 
 func (c *Client) SetupSignalHandlers() {
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SISTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		sig := <-sigChan
@@ -105,7 +108,7 @@ func (c *Client) StartClientLoop() {
 		
 		err := c.createClientSocket()
 		if err != nil {
-			if c.inRuning() {
+			if c.inRunning() {
 				log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
 			}
 			break
@@ -152,7 +155,14 @@ func (c *Client) StartClientLoop() {
 
 	}
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+rruptibleSleep(c.config.LoopPeriod)
 
+	}
+	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+
+	if c.isRunning() {
+		log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	}
 	if c.isRunning() {
 		log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 	}
