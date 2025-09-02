@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"time"
-	"sync"
 	"os"
-    "os/signal" 
-    "syscall"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/op/go-logging"
 )
@@ -108,14 +108,14 @@ func (c *Client) StartClientLoop() {
 		
 		err := c.createClientSocket()
 		if err != nil {
-			if c.inRunning() {
+			if c.isRunning() {
 				log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
 			}
 			break
 		}
 
 		// TODO: Modify the send to avoid short-write
-		message, err := fmt.Fprintf(
+		_, err = fmt.Fprintf(
 			c.conn,
 			"[CLIENT %v] Message N°%v\n",
 			c.config.ID,
@@ -154,11 +154,6 @@ func (c *Client) StartClientLoop() {
 		c.interruptibleSleep(c.config.LoopPeriod)
 
 	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-rruptibleSleep(c.config.LoopPeriod)
-
-	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 
 	if c.isRunning() {
 		log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
