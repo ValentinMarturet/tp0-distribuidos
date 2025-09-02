@@ -148,7 +148,7 @@ func (c *Client) StartClientLoop() {
 		}
 
 		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
+		c.interruptibleSleep(c.config.LoopPeriod)
 
 	}
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
@@ -170,4 +170,20 @@ func (c *Client) cleanup() {
 	
 	// ✅ CRÍTICO: Esta línea es lo que busca el test
 	log.Infof("action: exit | result: success")
+}
+
+func (c *Client) interruptibleSleep(duration time.Duration) {
+	ticker := time.NewTicker(50 * time.Millisecond) // Check every 50ms
+	defer ticker.Stop()
+	
+	start := time.Now()
+	
+	for {
+		select {
+		case <-ticker.C:
+			if !c.isRunning() || time.Since(start) >= duration {
+				return
+			}
+		}
+	}
 }
