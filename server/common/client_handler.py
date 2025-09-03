@@ -1,8 +1,8 @@
 import socket
 
-from server.common import utils
-from server.common.protocol_uitls import OperationCode, SimpleProtocol
-from server.common.utils import Bet
+from common import utils
+from common.protocol_uitls import OperationCode, SimpleProtocol
+from common.utils import Bet
 
 AGENCY = 0
 NAME = 1
@@ -18,6 +18,7 @@ class ClientHandler:
     handles a client connection
     closes the connection when done
     """
+    @staticmethod
     def handle_client(sock: socket.socket, logging):
         try:
             # lee el mensaje desde el socket
@@ -37,7 +38,7 @@ class ClientHandler:
 
             elif op == OperationCode.ERROR:
                 logging.error(f'action: receive_message | result: error | ip: {addr[0]} | op: {op} | message: {message}')
-                
+
             else: 
                 raise ValueError("Unexpected Operation Code")
             
@@ -46,16 +47,17 @@ class ClientHandler:
         finally:
             sock.close()
 
+    @staticmethod
     def format_message(op: OperationCode, message: str) -> str:
         raw_bets = []
         bets = message.split(';')
-        raw_bet = []
         for bet in bets:
+            raw_bet = []
             fields = bet.split(',')
-            if len(fields) == ClientHandler.FIELDS_NUM:
-                for i in range(ClientHandler.FIELDS_NUM):
+            if len(fields) == FIELDS_NUM:
+                for i in range(FIELDS_NUM):
                     raw_bet.append(fields[i])
-        raw_bets.append(raw_bet)
+            raw_bets.append(raw_bet)
         return raw_bets
 
 
@@ -75,5 +77,5 @@ def store_bets_from_list(bets: list[list[str]], logging):
     utils.store_bets(bets_to_load)
 
     for bet in bets_to_load:
-        logging.info(f"action: apuesta_almacenada | result: success | dni: {bet[DOCUMENT]} | numero: {bet[NUMBER]}")
+        logging.info(f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}")
 

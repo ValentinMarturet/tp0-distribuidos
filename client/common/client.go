@@ -1,12 +1,9 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -28,7 +25,6 @@ type Client struct {
 	config ClientConfig
 	conn   net.Conn
 	running bool
-	mutex  sync.RWMutex
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -54,8 +50,6 @@ func (c *Client) SetupSignalHandlers() {
 
 
 func (c *Client) shutdown() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 
 	log.Infof("action: graceful_shutdown | result: in_progress | client_id: %v", c.config.ID)
 	c.running = false
@@ -66,8 +60,6 @@ func (c *Client) shutdown() {
 }
 
 func (c *Client) isRunning() bool {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
 	return c.running
 }
 
@@ -94,74 +86,42 @@ func (c *Client) StartClientLoop() {
 
 	c.SetupSignalHandlers()
 
-
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-		// Create the connection the server in every loop iteration. Send an
-		
-		if !c.isRunning() {
-			log.Infof("action: loop_interrupted | result: success | client_id: %v | messages_sent: %v", 
-			c.config.ID, msgID-1)
-			break
+	err := c.createClientSocket()
+	if err != nil {
+		if c.isRunning() {
+			log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		}
-		
-		err := c.createClientSocket()
-		if err != nil {
-			if c.isRunning() {
-				log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
-			}
-			break
-		}
-
-		// TODO: Modify the send to avoid short-write
-		_, err = fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
-		if err != nil {
-			if c.isRunning() {
-				log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", c.config.ID, err)
-			}
-			c.conn.Close()
-			break
-		}
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		c.conn.Close()
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			break
-		}
-
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
-		)
-
-		if !c.isRunning() {
-			log.Infof("action: loop_interrupted | result: success | client_id: %v | messages_sent: %v", 
-				c.config.ID, msgID)
-			break
-		}
-
-		// Wait a time between sending one message and the next one
-		c.interruptibleSleep(c.config.LoopPeriod)
-
+		c.cleanup()
+		return
 	}
 
-	if c.isRunning() {
-		log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	bet := newBetFromEnv(c.config.ID)
+	err = bet.sendBetToSocket(c.conn)
+	if err != nil {
+		if c.isRunning() {
+			log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		}
+		c.cleanup()
+		return
 	}
-	if c.isRunning() {
-		log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	log.Infof("action: apuesta_enviada | result: success | dni: %s | numero: %s", bet.getDocument(), bet.getNumber())
+
+	// Espero confirmacion 
+	protocol := SimpleProtocol{}
+	opCode, message, err := protocol.DeserializeFromSocket(c.conn)
+	if err != nil {
+		if c.isRunning() {
+			log.Errorf("action: confirmacion_recibida | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		}
+		c.cleanup()
+		return
 	}
-	
+	if opCode != CONFIRMACION {
+		log.Errorf("action: confirmacion_recibida | result: fail | client_id: %v | error: %s", c.config.ID, "No se recibio la confirmacion esperada")
+	} else {
+		log.Infof("action: confirmacion_recibida | result: success | client_id: %v | message: %s", c.config.ID, message)
+	}
+
 	c.cleanup()
 }
 

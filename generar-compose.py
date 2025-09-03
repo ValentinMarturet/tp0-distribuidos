@@ -46,6 +46,11 @@ def generate_client_services(number):
     entrypoint: /client
     environment:
       - CLI_ID={i}
+      - BET_NAME=Santiago Lionel
+      - BET_LASTNAME=Lorca
+      - BET_DOCUMENT=30904465
+      - BET_BIRTHDATE=1999-03-17
+      - BET_NUMBER=7574
     networks:
       - testing_net
     depends_on:

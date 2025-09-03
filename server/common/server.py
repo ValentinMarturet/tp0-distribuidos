@@ -2,7 +2,7 @@ import socket
 import logging
 import signal
 
-from server.common.client_handler import ClientHandler
+from common.client_handler import ClientHandler
 
 
 class Server:
