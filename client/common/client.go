@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -28,7 +27,6 @@ type Client struct {
 	config ClientConfig
 	conn   net.Conn
 	running bool
-	mutex  sync.RWMutex
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -54,8 +52,6 @@ func (c *Client) SetupSignalHandlers() {
 
 
 func (c *Client) shutdown() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 
 	log.Infof("action: graceful_shutdown | result: in_progress | client_id: %v", c.config.ID)
 	c.running = false
@@ -66,8 +62,6 @@ func (c *Client) shutdown() {
 }
 
 func (c *Client) isRunning() bool {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
 	return c.running
 }
 
