@@ -43,6 +43,10 @@ class ClientHandler:
                 raise ValueError("Unexpected Operation Code")
             
         except Exception as e:
+            try:
+                SimpleProtocol.serialize_to_socket(sock, OperationCode.ERROR, str(e))
+            except Exception as e:
+                logging.error(f'action: send_response | result: fail | error: {e}')
             logging.error(f'action: receive_message | result: fail | error: {e}')
         finally:
             sock.close()
@@ -74,8 +78,10 @@ def store_bets_from_list(bets: list[list[str]], logging):
             bet[NUMBER]
         )
         bets_to_load.append(new_bet)
-    utils.store_bets(bets_to_load)
+    try:
+        utils.store_bets(bets_to_load)
+        logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets_to_load)}')
+    except Exception as e:
+        logging.error(f'action: apuesta_recibida | result: fail | cantidad: {len(bets_to_load)}')
 
-    for bet in bets_to_load:
-        logging.info(f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}")
 
