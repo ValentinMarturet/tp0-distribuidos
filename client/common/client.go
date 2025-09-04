@@ -142,6 +142,7 @@ func (c *Client) getWinnersFromServer() error {
 
 
 func (c *Client) awaitWinners() ([]string, error) {
+	winners := []string{}
 	protocol := SimpleProtocol{}
 	opCode, message, err := protocol.DeserializeFromSocket(c.conn)
 	if err != nil {
@@ -154,7 +155,9 @@ func (c *Client) awaitWinners() ([]string, error) {
 		log.Infof("action: sorteo | result: in_progress | client_id: %v | message: %s", c.config.ID, "El sorteo no se ha realizado aún")
 		return nil, nil
 	} else if opCode == WINNERS {
-		winners := strings.Split(message, ",")
+		if message != "" {
+			winners = strings.Split(message, ",")
+		}
 		return winners, nil
 	}
 	log.Errorf("action: ganadores_recibidos | result: fail | client_id: %v | error: %s", c.config.ID, "No se recibio la respuesta esperada (Codigo de operacion inesperado)")
