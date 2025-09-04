@@ -34,4 +34,9 @@ Los codigos de operacion posibles son:
 
 Pero esto se puede ir expandiendo si es necesario en las proximas secciones.
 
-Se espera que los campos de las apuestas enviadas tengan el formato AGENCIA,NOMBRE,APELLIDO,DOCUMENTO,NACIMIENTO,NUMERO y que si se recibe mas de una apuesta en el mismo mensaje, esten separadas por `;`
+En el campo mensaje se envia un string conteniendo el body del mensaje.
+Se espera que los campos de las apuestas enviadas tengan el formato AGENCIA,NOMBRE,APELLIDO,DOCUMENTO,NACIMIENTO,NUMERO y que si se recibe mas de una apuesta en el mismo mensaje, esten separadas por `;`.
+
+Para manejar los casos de short-reads y short-writes se implementaros funcion de read_exact y send_all. 
+De esta forma se asegura que al escribir, se haya enviado todo el contenido que se deseaba enviar, y de no ser esto posible se retorna un error. Y que al leer, se haya leido todo el contenido esperado y si esto no se logra, se retorna un error.
+
