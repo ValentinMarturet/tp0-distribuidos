@@ -15,6 +15,7 @@ const (
 	APUESTA      OperationCode = 1
 	CONFIRMACION OperationCode = 2
 	ERROR        OperationCode = 3
+	BATCH        OperationCode = 4
 )
 
 func (op OperationCode) String() string {
@@ -25,6 +26,8 @@ func (op OperationCode) String() string {
 		return "CONFIRMACION"
 	case ERROR:
 		return "ERROR"
+	case BATCH:
+		return "BATCH"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", uint8(op))
 	}
@@ -106,6 +109,8 @@ func (sp *SimpleProtocol) SerializeToSocket(conn net.Conn, opCode OperationCode,
 	// Construir mensaje completo
 	completeMessage := append(header.Bytes(), messageBytes...)
 	
+	log.Debugf("Sending message: OpCode=%s, Length=%d, TotalBytes=%d", opCode.String(), messageLength, len(completeMessage))
+
 	// Enviar todo el mensaje
 	return sp.sendAll(conn, completeMessage)
 }

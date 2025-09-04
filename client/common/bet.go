@@ -2,8 +2,16 @@ package common
 
 import (
 	"fmt"
-	"net"
 	"os"
+)
+
+
+const (
+	NAME      = 0
+	LASTNAME  = 1
+	DOCUMENT  = 2
+	BIRTHDATE = 3
+	NUMBER    = 4
 )
 
 type Bet struct {
@@ -26,16 +34,7 @@ func newBetFromEnv(agencyID string) Bet {
 	}
 }
 
-func (b *Bet) sendBetToSocket(socket net.Conn) error {
-	message := fmt.Sprintf("%s,%s,%s,%s,%s,%s", b.Agency, b.Name, b.LastName, b.Document, b.Birthdate, b.Number)
-	protocol := SimpleProtocol{}
-	return protocol.SerializeToSocket(socket, APUESTA, message)
+func (b *Bet) getRawBet() string {
+	return fmt.Sprintf("%s,%s,%s,%s,%s,%s", b.Agency, b.Name, b.LastName, b.Document, b.Birthdate, b.Number)
 }
 
-func (b *Bet) getDocument() string {
-	return b.Document
-}
-
-func (b *Bet) getNumber() string {
-	return b.Number
-}

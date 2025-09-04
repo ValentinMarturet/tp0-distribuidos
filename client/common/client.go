@@ -1,9 +1,11 @@
 package common
 
 import (
+	"bufio"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -12,12 +14,18 @@ import (
 
 var log = logging.MustGetLogger("log")
 
+const (
+	BETS_FILE           = "./data/agency.csv"
+	AWAIT_CONFIRMATION   = true
+)
+
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID            string
 	ServerAddress string
 	LoopAmount    int
 	LoopPeriod    time.Duration
+	MaxBatchAmount int
 }
 
 // Client Entity that encapsulates how
@@ -95,8 +103,8 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 
-	bet := newBetFromEnv(c.config.ID)
-	err = bet.sendBetToSocket(c.conn)
+	err = c.sendBetsFromFile(BETS_FILE, AWAIT_CONFIRMATION)
+
 	if err != nil {
 		if c.isRunning() {
 			log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | error: %v", c.config.ID, err)
@@ -104,23 +112,8 @@ func (c *Client) StartClientLoop() {
 		c.cleanup()
 		return
 	}
-	log.Infof("action: apuesta_enviada | result: success | dni: %s | numero: %s", bet.getDocument(), bet.getNumber())
+	log.Infof("action: apuesta_enviada | result: success")
 
-	// Espero confirmacion 
-	protocol := SimpleProtocol{}
-	opCode, message, err := protocol.DeserializeFromSocket(c.conn)
-	if err != nil {
-		if c.isRunning() {
-			log.Errorf("action: confirmacion_recibida | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		}
-		c.cleanup()
-		return
-	}
-	if opCode != CONFIRMACION {
-		log.Errorf("action: confirmacion_recibida | result: fail | client_id: %v | error: %s", c.config.ID, "No se recibio la confirmacion esperada")
-	} else {
-		log.Infof("action: confirmacion_recibida | result: success | client_id: %v | message: %s", c.config.ID, message)
-	}
 
 	c.cleanup()
 }
@@ -137,15 +130,88 @@ func (c *Client) cleanup() {
 	log.Infof("action: exit | result: success")
 }
 
-func (c *Client) interruptibleSleep(duration time.Duration) {
-	ticker := time.NewTicker(50 * time.Millisecond) // Check every 50ms
-	defer ticker.Stop()
-	
-	start := time.Now()
-	
-	for range ticker.C {
-		if !c.isRunning() || time.Since(start) >= duration {
-			return
+
+func (c *Client) awaitConfirmation(){
+	protocol := SimpleProtocol{}
+	opCode, message, err := protocol.DeserializeFromSocket(c.conn)
+	if err != nil {
+		if c.isRunning() {
+			log.Errorf("action: confirmacion_recibida | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		}
+		c.cleanup()
+		return
+	}
+	if opCode != CONFIRMACION {
+		log.Errorf("action: confirmacion_recibida | result: fail | client_id: %v | error: %s", c.config.ID, "No se recibio la confirmacion esperada")
+	} else {
+		log.Infof("action: confirmacion_recibida | result: success | client_id: %v | message: %s", c.config.ID, message)
+	}
+}
+
+func (c *Client)sendBetsFromFile(filePath string, awaitConfirmation bool) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	betsToSend := []Bet{}
+	amount := 0
+	for scanner.Scan() {
+		linea := scanner.Text()
+		fields := strings.Split(linea, ",")
+		if len(fields) < 5 {
+			continue
+		}
+		bet := Bet{
+			Agency:   c.config.ID,
+			Name:     fields[NAME],
+			LastName: fields[LASTNAME],
+			Document: fields[DOCUMENT],
+			Birthdate: fields[BIRTHDATE],
+			Number:   fields[NUMBER],
+		}
+		betsToSend = append(betsToSend, bet)
+
+		if amount++; amount >=  c.config.MaxBatchAmount {
+			if err := sendBetListToSocket(betsToSend, c.conn, BATCH); err != nil {
+				// no se toleran fallos del servidor, si se produce uno se debe detener el envío
+				log.Errorf("action: envio_en_lote | result: fail | error: %v", err)
+				return err
+			}
+			if awaitConfirmation {
+				c.awaitConfirmation()
+			}
+			betsToSend = []Bet{}
+			amount = 0
 		}
 	}
+	if len(betsToSend) > 0 {
+		if err := sendBetListToSocket(betsToSend, c.conn, APUESTA); err != nil {
+			log.Errorf("action: envio_en_lote | result: fail | error: %v", err)
+			return err
+		}
+		if awaitConfirmation {
+			c.awaitConfirmation()
+		}
+	}
+
+	// en caso de no querer esperar todos las confirmaciones, espero solo una, queda del lado del servidor compartir la misma configuracion que la del cliente
+	if !awaitConfirmation {
+		c.awaitConfirmation()
+	}
+
+	return nil
+}
+
+func sendBetListToSocket(bets []Bet, socket net.Conn, op OperationCode) error {
+	message := ""
+	for _, bet := range bets {
+		message += bet.getRawBet() + ";"
+	}
+	message = strings.TrimSuffix(message, ";") // Remove the trailing semicolon
+	protocol := SimpleProtocol{}
+	return protocol.SerializeToSocket(socket, op, message)
 }
