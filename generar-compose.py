@@ -43,6 +43,7 @@ def generate_client_services(number):
     image: client:latest
     volumes:
       - ./client/config.yaml:/config.yaml
+      - ./client/data/agency-{i}.csv:/data/agency.csv
     entrypoint: /client
     environment:
       - CLI_ID={i}
