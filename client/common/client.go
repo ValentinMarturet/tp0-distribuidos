@@ -131,6 +131,7 @@ func (c *Client) getWinnersFromServer() error {
 		if winners != nil {
 			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d", len(winners))
 			gotWinners = true
+			log.Infof("action: ganadores_recibidos | result: success | client_id: %v | winners: %s", c.config.ID, strings.Join(winners, ","))
 		} else {
 			time.Sleep(SLEEP_TIME * time.Second)
 		}
