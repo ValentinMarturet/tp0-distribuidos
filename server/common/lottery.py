@@ -1,10 +1,11 @@
+import os
 from common.utils import has_won, load_bets
-
-NUMBER_OF_AGENCIES = 5
 
 class Lottery:
     def __init__(self):
-        self._agencies = [False] * NUMBER_OF_AGENCIES
+        #get number of agencies from env variable
+        self._number_of_agencies = int(os.getenv('NUMBER_OF_AGENCIES', 5))
+        self._agencies = [False] * self._number_of_agencies
         self._winners = {}
         self._draw_done = False
 

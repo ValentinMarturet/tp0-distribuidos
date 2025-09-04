@@ -16,6 +16,7 @@ services:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - NUMBER_OF_AGENCIES={number}
     networks:
       - testing_net
 
