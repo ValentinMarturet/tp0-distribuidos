@@ -17,6 +17,7 @@ var log = logging.MustGetLogger("log")
 const (
 	BETS_FILE           = "./data/agency.csv"
 	AWAIT_CONFIRMATION   = true
+	SLEEP_TIME		  = 2
 )
 
 // ClientConfig Configuration used by the client
@@ -91,16 +92,97 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
+	err := c.sendBetsToServer()
+	if err != nil {
+		c.cleanup()
+		return
+	}
 
-	c.SetupSignalHandlers()
+	err = c.getWinnersFromServer()
+	if err != nil {
+		c.cleanup()
+		return
+	}
+
+	c.cleanup()
+}
+
+func (c *Client) getWinnersFromServer() error {
+	gotWinners := false
+
+	for !gotWinners && c.isRunning() {
+		err := c.createClientSocket()
+		if err != nil {
+			if c.isRunning() {
+				log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			}
+			return err
+		}
+	
+		err = c.askServerForWinners()
+		if err != nil {
+			return err
+		}
+	
+		winners, err := c.awaitWinners()
+		if err != nil {
+			return err
+		}
+		if winners != nil {
+			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d", len(winners))
+			gotWinners = true
+		} else {
+			time.Sleep(SLEEP_TIME * time.Second)
+		}
+	}
+
+	return nil
+}
+
+
+func (c *Client) awaitWinners() ([]string, error) {
+	winners := []string{}
+	protocol := SimpleProtocol{}
+	opCode, message, err := protocol.DeserializeFromSocket(c.conn)
+	if err != nil {
+		if c.isRunning() {
+			log.Errorf("action: ganadores_recibidos | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		}
+		return nil, err
+	}
+	if opCode == NOT_READY {
+		log.Infof("action: sorteo | result: in_progress | client_id: %v | message: %s", c.config.ID, "El sorteo no se ha realizado aún")
+		return nil, nil
+	} else if opCode == WINNERS {
+		winners = strings.Split(message, ";")
+		return winners, nil
+	}
+	log.Errorf("action: ganadores_recibidos | result: fail | client_id: %v | error: %s", c.config.ID, "No se recibio la respuesta esperada (Codigo de operacion inesperado)")
+	return nil, nil
+}
+
+
+func (c *Client) askServerForWinners() error {
+	protocol := SimpleProtocol{}
+	err := protocol.SerializeToSocket(c.conn, WINNERS, c.config.ID)
+	if err != nil {
+		log.Errorf("action: consulta_ganadores | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return err
+	}
+	return nil
+}
+
+
+
+func (c *Client) sendBetsToServer() error {
+		c.SetupSignalHandlers()
 
 	err := c.createClientSocket()
 	if err != nil {
 		if c.isRunning() {
 			log.Errorf("action: create_socket | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		}
-		c.cleanup()
-		return
+		return err
 	}
 
 	err = c.sendBetsFromFile(BETS_FILE, AWAIT_CONFIRMATION)
@@ -109,13 +191,11 @@ func (c *Client) StartClientLoop() {
 		if c.isRunning() {
 			log.Errorf("action: apuesta_enviada | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		}
-		c.cleanup()
-		return
+		return err
 	}
 	log.Infof("action: apuesta_enviada | result: success")
 
-
-	c.cleanup()
+	return nil
 }
 
 func (c *Client) cleanup() {
@@ -189,7 +269,7 @@ func (c *Client)sendBetsFromFile(filePath string, awaitConfirmation bool) error 
 		}
 	}
 	if len(betsToSend) > 0 {
-		if err := sendBetListToSocket(betsToSend, c.conn, APUESTA); err != nil {
+		if err := sendBetListToSocket(betsToSend, c.conn, BATCH); err != nil {
 			log.Errorf("action: envio_en_lote | result: fail | error: %v", err)
 			return err
 		}
@@ -202,6 +282,14 @@ func (c *Client)sendBetsFromFile(filePath string, awaitConfirmation bool) error 
 	if !awaitConfirmation {
 		c.awaitConfirmation()
 	}
+
+	protocol := SimpleProtocol{}
+	err = protocol.SerializeToSocket(c.conn, READY, c.config.ID)
+	if err != nil {
+		log.Errorf("action: aviso_listo | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return err
+	}
+	log.Infof("action: aviso_listo | result: success")
 
 	return nil
 }

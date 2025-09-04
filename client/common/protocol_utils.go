@@ -16,6 +16,9 @@ const (
 	CONFIRMACION OperationCode = 2
 	ERROR        OperationCode = 3
 	BATCH        OperationCode = 4
+	WINNERS      OperationCode = 5
+	NOT_READY    OperationCode = 6
+	READY        OperationCode = 7
 )
 
 func (op OperationCode) String() string {
@@ -28,6 +31,12 @@ func (op OperationCode) String() string {
 		return "ERROR"
 	case BATCH:
 		return "BATCH"
+	case WINNERS:
+		return "WINNERS"
+	case NOT_READY:
+		return "NOT_READY"
+	case READY:
+		return "READY"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", uint8(op))
 	}
