@@ -8,6 +8,7 @@ class OperationCode(IntEnum):
     APUESTA = 1
     CONFIRMACION = 2
     ERROR = 3
+    BATCH = 4
 
 class SerializationError(Exception):
     """Excepción para errores de serialización"""

@@ -22,25 +22,26 @@ class ClientHandler:
     def handle_client(sock: socket.socket, logging):
         try:
             # lee el mensaje desde el socket
-            op, message = SimpleProtocol.deserialize_from_socket(sock)
-            addr = sock.getpeername()
+            while True: 
+                op, message = SimpleProtocol.deserialize_from_socket(sock)
+                addr = sock.getpeername()
 
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | op: {op}')
+                # logging.info(f'action: receive_message | result: success | ip: {addr[0]} | op: {op}')
 
-            # opera de acuerdo al tipo de operacion
-            if op == OperationCode.APUESTA:
-                raw_bets = ClientHandler.format_message(op, message)
-                store_bets_from_list(raw_bets, logging)
+                # opera de acuerdo al tipo de operacion
+                if op == OperationCode.APUESTA:
+                    handle_bets(op, message, logging, sock)
 
-                logging.info(f'action: receive_message | result: success | ip: {addr[0]} | op: {op}')
-                # envia la respuesta
-                SimpleProtocol.serialize_to_socket(sock, OperationCode.CONFIRMACION, "Apuestas recibidas")
+                elif op == OperationCode.BATCH:
+                    handle_bets(op, message, logging, sock)
+                    continue
 
-            elif op == OperationCode.ERROR:
-                logging.error(f'action: receive_message | result: error | ip: {addr[0]} | op: {op} | message: {message}')
+                elif op == OperationCode.ERROR:
+                    logging.error(f'action: receive_message | result: error | ip: {addr[0]} | op: {op} | message: {message}')
 
-            else: 
-                raise ValueError("Unexpected Operation Code")
+                else:
+                    raise ValueError("Unexpected Operation Code")
+                break
             
         except Exception as e:
             try:
@@ -81,7 +82,21 @@ def store_bets_from_list(bets: list[list[str]], logging):
     try:
         utils.store_bets(bets_to_load)
         logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets_to_load)}')
+        return None
     except Exception as e:
         logging.error(f'action: apuesta_recibida | result: fail | cantidad: {len(bets_to_load)}')
+        return e
 
 
+def handle_bets(op: OperationCode, message: str, logging, sock: socket.socket):
+    raw_bets = ClientHandler.format_message(op, message)
+    err = store_bets_from_list(raw_bets, logging)
+
+    addr = sock.getpeername()
+
+    logging.info(f'action: receive_message | result: success | ip: {addr[0]} | op: {op}')
+    # envia la respuesta
+    if err is None:
+        SimpleProtocol.serialize_to_socket(sock, OperationCode.CONFIRMACION, "Apuestas recibidas")
+    else:
+        SimpleProtocol.serialize_to_socket(sock, OperationCode.ERROR, str(err))
