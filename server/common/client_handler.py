@@ -1,4 +1,5 @@
 import socket
+import threading
 
 from common import utils
 from common.protocol_uitls import OperationCode, SimpleProtocol
@@ -20,7 +21,7 @@ class ClientHandler:
     closes the connection when done
     """
     @staticmethod
-    def handle_client(sock: socket.socket, logging, lottery: Lottery):
+    def handle_client(sock: socket.socket, logging, lottery: Lottery, lottery_lock: threading.Lock, bets_lock: threading.Lock):
         try:
             # lee el mensaje desde el socket
             while True: 
@@ -31,10 +32,10 @@ class ClientHandler:
 
                 # opera de acuerdo al tipo de operacion
                 if op == OperationCode.APUESTA: #codigo de operacion deprecado, utilizado en la parte 5
-                    handle_bets(op, message, logging, sock)
+                    handle_bets(op, message, logging, sock, bets_lock)
 
                 elif op == OperationCode.BATCH:
-                    handle_bets(op, message, logging, sock)
+                    handle_bets(op, message, logging, sock, bets_lock)
                     continue
 
                 elif op == OperationCode.ERROR:
@@ -42,18 +43,20 @@ class ClientHandler:
                 
                 elif op == OperationCode.READY:
                     agency_id = int(message)
-                    lottery.mark_agency_ready(agency_id)
-                    logging.info(f'action: agencia_lista | result: success | ip: {addr[0]} | agency_id: {agency_id}')
+                    with lottery_lock:
+                        lottery.mark_agency_ready(agency_id)
+                        logging.info(f'action: agencia_lista | result: success | ip: {addr[0]} | agency_id: {agency_id}')
                 
                 elif op == OperationCode.WINNERS:
                     agency_id = int(message)
-                    if lottery.draw_done():
-                        winners = lottery.get_winners_for_agency(agency_id)
-                        SimpleProtocol.serialize_to_socket(sock, OperationCode.WINNERS, winners)
-                        logging.info(f'action: enviar_ganadores | result: success | agency_id: {agency_id}')
-                    else:
-                        lottery.mark_agency_ready(agency_id) #se vuelve a marcar como lista por si no lo estaba
-                        SimpleProtocol.serialize_to_socket(sock, OperationCode.NOT_READY, "Sorteo no realizado")
+                    with lottery_lock:
+                        if lottery.draw_done():
+                            winners = lottery.get_winners_for_agency(agency_id)
+                            SimpleProtocol.serialize_to_socket(sock, OperationCode.WINNERS, winners)
+                            logging.info(f'action: enviar_ganadores | result: success | agency_id: {agency_id}')
+                        else:
+                            lottery.mark_agency_ready(agency_id) #se vuelve a marcar como lista por si no lo estaba
+                            SimpleProtocol.serialize_to_socket(sock, OperationCode.NOT_READY, "Sorteo no realizado")
 
                 else:
                     raise ValueError("Unexpected Operation Code")
@@ -82,7 +85,7 @@ class ClientHandler:
         return raw_bets
 
 
-def store_bets_from_list(bets: list[list[str]], logging):
+def store_bets_from_list(bets: list[list[str]], logging, bets_lock: threading.Lock):
 
     bets_to_load = []
     for bet in bets:
@@ -96,7 +99,8 @@ def store_bets_from_list(bets: list[list[str]], logging):
         )
         bets_to_load.append(new_bet)
     try:
-        utils.store_bets(bets_to_load)
+        with bets_lock:
+            utils.store_bets(bets_to_load)
         logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets_to_load)}')
         return None
     except Exception as e:
@@ -104,9 +108,9 @@ def store_bets_from_list(bets: list[list[str]], logging):
         return e
 
 
-def handle_bets(op: OperationCode, message: str, logging, sock: socket.socket):
+def handle_bets(op: OperationCode, message: str, logging, sock: socket.socket, bets_lock: threading.Lock):
     raw_bets = ClientHandler.format_message(op, message)
-    err = store_bets_from_list(raw_bets, logging)
+    err = store_bets_from_list(raw_bets, logging, bets_lock)
 
     addr = sock.getpeername()
 
