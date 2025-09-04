@@ -3,6 +3,7 @@ import socket
 from common import utils
 from common.protocol_uitls import OperationCode, SimpleProtocol
 from common.utils import Bet
+from common.lottery import Lottery
 
 AGENCY = 0
 NAME = 1
@@ -19,7 +20,7 @@ class ClientHandler:
     closes the connection when done
     """
     @staticmethod
-    def handle_client(sock: socket.socket, logging):
+    def handle_client(sock: socket.socket, logging, lottery: Lottery):
         try:
             # lee el mensaje desde el socket
             while True: 
@@ -29,7 +30,7 @@ class ClientHandler:
                 # logging.info(f'action: receive_message | result: success | ip: {addr[0]} | op: {op}')
 
                 # opera de acuerdo al tipo de operacion
-                if op == OperationCode.APUESTA:
+                if op == OperationCode.APUESTA: #codigo de operacion deprecado, utilizado en la parte 5
                     handle_bets(op, message, logging, sock)
 
                 elif op == OperationCode.BATCH:
@@ -38,6 +39,21 @@ class ClientHandler:
 
                 elif op == OperationCode.ERROR:
                     logging.error(f'action: receive_message | result: error | ip: {addr[0]} | op: {op} | message: {message}')
+                
+                elif op == OperationCode.READY:
+                    agency_id = int(message)
+                    lottery.mark_agency_ready(agency_id)
+                    logging.info(f'action: agencia_lista | result: success | ip: {addr[0]} | agency_id: {agency_id}')
+                
+                elif op == OperationCode.WINNERS:
+                    agency_id = int(message)
+                    if lottery.draw_done():
+                        winners = lottery.get_winners_for_agency(agency_id)
+                        SimpleProtocol.serialize_to_socket(sock, OperationCode.WINNERS, winners)
+                        logging.info(f'action: enviar_ganadores | result: success | agency_id: {agency_id}')
+                    else:
+                        lottery.mark_agency_ready(agency_id) #se vuelve a marcar como lista por si no lo estaba
+                        SimpleProtocol.serialize_to_socket(sock, OperationCode.NOT_READY, "Sorteo no realizado")
 
                 else:
                     raise ValueError("Unexpected Operation Code")

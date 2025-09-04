@@ -3,6 +3,7 @@ import logging
 import signal
 
 from common.client_handler import ClientHandler
+from common.lottery import Lottery
 
 
 class Server:
@@ -11,6 +12,8 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+
+        self._lottery = Lottery()
 
         self._running = True
 
@@ -75,7 +78,10 @@ class Server:
         If a problem arises in the communication with the client, the
         client socket will also be closed
         """
-        ClientHandler.handle_client(client_sock, logging)
+        ClientHandler.handle_client(client_sock, logging, self._lottery)
+        if self._lottery.all_agencies_ready() and not self._lottery.draw_done(): 
+            self._lottery.make_draw()
+            logging.info('action: sorteo | result: success')
 
     def __accept_new_connection(self):
         """

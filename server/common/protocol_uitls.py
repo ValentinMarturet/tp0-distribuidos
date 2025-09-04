@@ -9,6 +9,9 @@ class OperationCode(IntEnum):
     CONFIRMACION = 2
     ERROR = 3
     BATCH = 4
+    WINNERS = 5
+    NOT_READY = 6
+    READY = 7
 
 class SerializationError(Exception):
     """Excepción para errores de serialización"""
